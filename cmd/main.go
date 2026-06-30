@@ -71,6 +71,8 @@ func main() {
 	billingHandler := handler.NewBillingHandler(billingService)
 
 	router := gin.Default()
+	router.StaticFile("/swagger", "./docs/swagger.html")
+	router.StaticFile("/swagger/openapi.yaml", "./docs/openapi.yaml")
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})

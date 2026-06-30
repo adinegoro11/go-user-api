@@ -22,3 +22,12 @@ Production-oriented Gin + GORM user API with register, login, self-service profi
 1. Set the environment variables in `.env`.
 2. Start PostgreSQL with `docker compose up -d db`.
 3. Run the API with `go run ./cmd`.
+
+## Swagger Docs
+
+- Swagger UI: `/swagger`
+- OpenAPI spec: `/swagger/openapi.yaml`
+
+When running locally at default port:
+
+- `http://localhost:8080/swagger`

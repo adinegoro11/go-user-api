@@ -1,0 +1,360 @@
+openapi: 3.0.3
+info:
+  title: Go User API - ISP Billing Flow
+  version: 1.0.0
+  description: |
+    Swagger documentation for the new customer onboarding flow:
+    register customer, select products, create subscription, generate invoice,
+    and complete payment lifecycle.
+servers:
+  - url: http://localhost:8080
+    description: Local
+paths:
+  /api/customers:
+    post:
+      summary: Register customer
+      description: Register a customer with status PENDING and publish CustomerRegistered event.
+      tags: [Customer]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCustomerRequest'
+      responses:
+        '201':
+          description: Customer registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerRegisterResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate email or phone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/customers/{id}:
+    get:
+      summary: Get customer detail
+      tags: [Customer]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: Customer detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDetailResponse'
+        '400':
+          description: Invalid ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/subscriptions:
+    post:
+      summary: Create subscription
+      description: |
+        Select products for a customer, create subscription with status WAITING_INSTALLATION,
+        trigger welcome email, OTT notification, and auto-generate invoice.
+      tags: [Subscription]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        '201':
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionCreateResponse'
+        '400':
+          description: Invalid request/product selection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/billing/generate:
+    post:
+      summary: Generate invoice manually
+      description: Generate invoice for customer and subscription with status UNPAID.
+      tags: [Billing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceActionResponse'
+        '400':
+          description: Invalid request or empty subscription products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer/subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/billing/invoices:
+    get:
+      summary: List invoices by customer
+      tags: [Billing]
+      parameters:
+        - name: customer_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: List invoices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceListResponse'
+        '400':
+          description: Invalid customer_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/billing/invoices/{id}:
+    get:
+      summary: Get invoice detail
+      tags: [Billing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: Invoice detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDetailResponse'
+        '400':
+          description: Invalid ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invoice not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/billing/invoices/{id}/pay:
+    post:
+      summary: Pay invoice
+      description: Mark invoice as PAID and activate related customer/subscription.
+      tags: [Billing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: Invoice paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceActionResponse'
+        '400':
+          description: Invalid ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invoice not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    RegisterCustomerRequest:
+      type: object
+      required: [name, email, phone, address]
+      properties:
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@email.com
+        phone:
+          type: string
+          example: "08123456789"
+        address:
+          type: string
+          example: Jakarta
+    CustomerResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        customer_number:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        status:
+          type: string
+          example: PENDING
+    CreateSubscriptionRequest:
+      type: object
+      required: [customer_id, product_ids]
+      properties:
+        customer_id:
+          type: integer
+          example: 1
+        product_ids:
+          type: array
+          items:
+            type: integer
+          example: [1, 2]
+    SubscriptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        customer_id:
+          type: integer
+        status:
+          type: string
+          example: WAITING_INSTALLATION
+        invoice_id:
+          type: integer
+        invoice_number:
+          type: string
+    GenerateInvoiceRequest:
+      type: object
+      required: [customer_id, subscription_id]
+      properties:
+        customer_id:
+          type: integer
+        subscription_id:
+          type: integer
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoice_number:
+          type: string
+          example: INV-202607-000001
+        customer_id:
+          type: integer
+        subscription_id:
+          type: integer
+        subtotal:
+          type: integer
+        tax:
+          type: integer
+        discount:
+          type: integer
+        grand_total:
+          type: integer
+        status:
+          type: string
+          example: UNPAID
+        payment_link:
+          type: string
+    CustomerRegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: customer registered
+        data:
+          $ref: '#/components/schemas/CustomerResponse'
+    CustomerDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/CustomerResponse'
+    SubscriptionCreateResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: subscription created
+        data:
+          $ref: '#/components/schemas/SubscriptionResponse'
+    InvoiceActionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/InvoiceResponse'
+    InvoiceDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/InvoiceResponse'
+    InvoiceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceResponse'
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
