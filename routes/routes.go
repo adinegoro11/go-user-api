@@ -6,12 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(router *gin.Engine, authHandler *handler.AuthHandler, userHandler *handler.UserHandler, productHandler *handler.ProductHandler) {
+func SetupRoutes(router *gin.Engine, authHandler *handler.AuthHandler, userHandler *handler.UserHandler, productHandler *handler.ProductHandler, customerHandler *handler.CustomerHandler, subscriptionHandler *handler.SubscriptionHandler, billingHandler *handler.BillingHandler) {
 	api := router.Group("/api")
 	api.POST("/register", authHandler.Register)
 	api.POST("/login", authHandler.Login)
+	api.POST("/customers", customerHandler.Register)
+	api.GET("/customers/:id", customerHandler.Detail)
 	api.GET("/products", productHandler.FindAll)
 	api.GET("/products/:id", productHandler.FindByID)
+	api.POST("/subscriptions", subscriptionHandler.Create)
+	api.POST("/billing/generate", billingHandler.Generate)
+	api.GET("/billing/invoices", billingHandler.ListByCustomer)
+	api.GET("/billing/invoices/:id", billingHandler.Detail)
+	api.POST("/billing/invoices/:id/pay", billingHandler.Pay)
 
 	auth := api.Group("")
 	auth.Use(middleware.AuthMiddleware())
