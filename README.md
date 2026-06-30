@@ -11,6 +11,11 @@ Production-oriented Gin + GORM user API with register, login, self-service profi
 - `GET /api/admin/users`
 - `GET /api/admin/users/:id`
 - `DELETE /api/admin/users/:id`
+- `GET /api/products?page=1&page_size=10`
+- `GET /api/products/:id`
+- `POST /api/products` (admin)
+- `PUT /api/products/:id` (admin)
+- `DELETE /api/products/:id` (authenticated, soft delete)
 
 ## Run locally
 

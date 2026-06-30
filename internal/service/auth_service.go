@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 )
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
+var ErrEmailAlreadyRegistered = errors.New("email already registered")
+var ErrInvalidRegisterInput = errors.New("invalid register input")
 
 type AuthService struct {
 	userRepo  repository.UserRepository
@@ -24,21 +27,43 @@ func NewAuthService(userRepo repository.UserRepository, jwtSecret string) *AuthS
 }
 
 func (s *AuthService) Register(req dto.RegisterRequest) (dto.UserResponse, error) {
+	name := strings.TrimSpace(req.Name)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	if name == "" || email == "" {
+		slog.Warn("register rejected due to invalid input", "email", email)
+		return dto.UserResponse{}, ErrInvalidRegisterInput
+	}
+
+	existingUser, err := s.userRepo.FindByEmail(email)
+	if err == nil && existingUser != nil {
+		slog.Warn("register rejected due to duplicate email", "email", email)
+		return dto.UserResponse{}, ErrEmailAlreadyRegistered
+	}
+	if err != nil && !errors.Is(err, repository.ErrUserNotFound) {
+		slog.Error("register failed while checking existing user", "email", email, "error", err)
+		return dto.UserResponse{}, err
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("register failed while hashing password", "email", email, "error", err)
 		return dto.UserResponse{}, err
 	}
 
 	user := model.User{
-		Name:     strings.TrimSpace(req.Name),
-		Email:    strings.ToLower(strings.TrimSpace(req.Email)),
+		Name:     name,
+		Email:    email,
 		Password: string(hashedPassword),
 		Role:     model.RoleUser,
 	}
 
 	if err := s.userRepo.Create(&user); err != nil {
+		slog.Error("register failed while creating user", "email", email, "error", err)
 		return dto.UserResponse{}, err
 	}
+
+	slog.Info("register success", "user_id", user.ID, "email", user.Email)
 
 	return toUserResponse(&user), nil
 }

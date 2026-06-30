@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/adinegoro11/go-user-api/internal/dto"
@@ -8,27 +9,42 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type AuthHandler struct {
-	authService *service.AuthService
+type AuthService interface {
+	Register(req dto.RegisterRequest) (dto.UserResponse, error)
+	Login(req dto.LoginRequest) (dto.AuthResponse, error)
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+type AuthHandler struct {
+	authService AuthService
+}
+
+func NewAuthHandler(authService AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Warn("register request validation failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	user, err := h.authService.Register(req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		switch err {
+		case service.ErrInvalidRegisterInput:
+			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		case service.ErrEmailAlreadyRegistered:
+			c.JSON(http.StatusConflict, gin.H{"message": err.Error()})
+		default:
+			slog.Error("register failed", "email", req.Email, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to register"})
+		}
 		return
 	}
 
+	slog.Info("register handler success", "user_id", user.ID, "email", user.Email)
 	c.JSON(http.StatusCreated, gin.H{"message": "register success", "user": user})
 }
 
